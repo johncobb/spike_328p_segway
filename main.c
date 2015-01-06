@@ -23,6 +23,7 @@
 #include "eeprom/eeprom.h"
 //#include "blc/blc.h"
 #include "gimbal/gimbal.h"
+#include "kalman/kalman.h"
 
 
 
