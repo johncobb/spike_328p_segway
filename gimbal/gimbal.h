@@ -20,6 +20,10 @@ enum gimbal_states {
 
 volatile extern int8_t gimbal_state;
 
+#define DEG_TO_RAD 0.017453292519943295769236907684886
+#define RAD_TO_DEG 57.295779513082320876798154814105
+
+
 #define LOCK_TIME_SEC 5000   // gimbal fast lock time at startup
 
 #define MOTORUPDATE_FREQ 500                 // in Hz, 1000 is default

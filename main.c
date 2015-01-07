@@ -23,7 +23,7 @@
 #include "eeprom/eeprom.h"
 //#include "blc/blc.h"
 #include "gimbal/gimbal.h"
-#include "kalman/kalman.h"
+
 
 
 
@@ -56,7 +56,7 @@ void main()
 	clock_init();
 	sei();
 
-	LOG("\r\n\r\nspike_328p_imu starting...\r\n");
+	LOG("\r\n\r\nspike_328p_segway starting...\r\n");
 
 	/*
 	 * load configuration
@@ -85,7 +85,6 @@ void main()
 	} else {
 		LOG("imu test failed!\r\n");
 	}
-
 	/* --- end i2c/gyro/imu initialization ---*/
 
 
@@ -99,21 +98,19 @@ void main()
 	LOG("init_pids...\r\n");
 	init_pids();
 
-	// TODO: Not implemented
-	// Init rc variables
-	//init_rc();
-	// Init rc-input
-	//init_rc_pins();
-
 	/*
 	 * gimbal is the main state machine
 	 * for processing stabilization
 	 */
 	LOG("gimbal_init...\r\n");
 	gimbal_init();
+	//kalman_init();
 
 
-	LOG("starting gimbal loop...\r\n");
+
+
+
+	LOG("starting segway loop...\r\n");
 
 	int16_t axis_rotation[3];
 	while(1)
@@ -128,7 +125,7 @@ void main()
 		}
 
 		gimbal_tick();
-		balance();
+		//balance();
 	}
 }
 

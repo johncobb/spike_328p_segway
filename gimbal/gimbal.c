@@ -15,6 +15,8 @@
 #include "../math/fast_math.h"
 #include "../imu/imu.h"
 #include "../imu/gyro.h"
+#include "../kalman/kalman2.h"
+//#include "../kalman/kalman.h"
 #include "gimbal.h"
 
 // https://github.com/sparkfun/MPU-9150_Breakout/blob/master/firmware/MPU6050/Examples/MPU9150_AHRS.ino
@@ -45,6 +47,7 @@ static clock_time_t f_log_timeout = 0;
 // local prototypes
 void gimbal_accel_angle();
 void gimbal_complementary_angle();
+void gimbal_kalman_angle();
 void log_application_data();
 
 uint16_t mag_count = 0; // used to control display output rate
@@ -101,8 +104,35 @@ void set_acc_time_constant(int16_t acc_time_constant){
 	acc_compl_filter_const = (float)DT_FLOAT/(acc_time_constant + DT_FLOAT);
 }
 
+kalman_state kalman_roll;
+
 void gimbal_init()
 {
+
+	//kalman_init2(&kalman_roll, 0.001f, 0.003f,  0.03f, 0.0f, 0.0f);
+	//kalman_init();
+
+	// initial tunable variables
+	kalman_roll.q_angle = 0.001f;
+	kalman_roll.q_bias = 0.003f;
+	kalman_roll.r_measure = 0.03f;
+
+	kalman_roll.k_angle = 0.0f; // reset the angle
+	kalman_roll.bias = 0.0f; // reset bias
+
+
+	// Since we assume that the bias is 0 and we know the starting angle (use setAngle),
+	// the error covariance matrix is set like so -
+	// see: http://en.wikipedia.org/wiki/Kalman_filter#Example_application.2C_technical
+
+	kalman_roll.P[0][0] = 0.0f;
+	kalman_roll.P[0][1] = 0.0f;
+	kalman_roll.P[1][0] = 0.0f;
+	kalman_roll.P[1][1] = 0.0f;
+
+
+
+
 	// resolution=131, scale = 0.000133
 	//gyro_scale = 1.0 / resolution_divider/ 180.0 * PI * DT_FLOAT;
 	//LOG("gyro_scale: %d\r\n", gyro_scale*1000);
@@ -124,7 +154,8 @@ void gimbal_init()
 
 void gimbal_tick()
 {
-	gimbal_complementary_angle();
+	gimbal_kalman_angle();
+	//gimbal_complementary_angle();
 	//gimbal_accel_angle();
 }
 
@@ -191,6 +222,7 @@ void read_sensor_data(int16_t aX, int16_t aY, int16_t aZ, int16_t gX, int16_t gY
 void read_sensor_data(int16_t aX, int16_t aY, int16_t aZ, int16_t gX, int16_t gY, int16_t gZ, int16_t mX, int16_t mY, int16_t mZ)
 {
 
+	mag_count++;
 	// *** ACCEL ***
 
 	imu_get_acceleration(aX, aY, aZ);
@@ -224,8 +256,6 @@ void read_sensor_data(int16_t aX, int16_t aY, int16_t aZ, int16_t gX, int16_t gY
 void gimbal_complementary_angle()
 {
 	int16_t aX=0, aY=0, aZ=0, gX=0, gY=0, gZ=0, mX=0, mY=0, mZ=0;
-
-	mag_count++;
 
 	//read_sensor_data();
 	read_sensor_data(&aX, &aY, &aZ, &gX, &gY, &gZ, &mX, &mY, &mZ);
@@ -323,6 +353,112 @@ void gimbal_complementary_angle()
 		//LOG("%f %f %f %f\r\n", angle_x, angle_y, angle_z, dt);
 		LOG("roll/pitch/yaw %f:%f:%f\r\n", angle_x, angle_y, angle_z);
 	}
+}
+
+
+
+float kal_angle_x = 0.0f;
+
+//void gimbal_kalman_angle()
+//{
+//	int16_t aX=0, aY=0, aZ=0, gX=0, gY=0, gZ=0, mX=0, mY=0, mZ=0;
+//
+//	read_sensor_data(&aX, &aY, &aZ, &gX, &gY, &gZ, &mX, &mY, &mZ);
+//
+//	clock_time_t t_now = clock_time();
+//
+//
+//	clock_time_t delta_t = (t_now-_last_time_read);
+//
+//	float dt = ((float)delta_t)/1000.0f;
+//
+//	float accel_x = (float)aX;
+//	float accel_y = (float)aY;
+//	float accel_z = (float)aZ;
+//
+//	float gyro_x = (float)gX;
+//	float gyro_y = (float)gY;
+//	float gyro_z = (float)gZ;
+//
+//	gyro_x = ((float) gX)*DEG_TO_RAD;
+//	gyro_y = ((float) gY)*DEG_TO_RAD;
+//	gyro_z = ((float) gZ)*DEG_TO_RAD;
+//
+//
+//	// restricting pitch
+//	float roll = atan2(accel_y, accel_z) * RAD_TO_DEG;
+//	float pitch = atan(-accel_x / sqrt(pow(accel_y, 2) + pow(accel_z, 2))) * RAD_TO_DEG;
+//
+//	if((roll < -90.0f && kal_angle_x > 90.0f) || (roll > 90.0f && kal_angle_x < -90.0f)) {
+//		set_angle(roll);
+//		kal_angle_x = roll;
+//
+//	} else {
+//		kal_angle_x = get_angle(roll, gyro_x, dt);
+//	}
+//
+//	_last_time_read = t_now;
+//
+//	// Throttle output to .1x per second
+//	if(clock_time() >= f_log_timeout) {
+//		f_log_timeout = clock_time() + 10;
+//		//LOG("%f %f %f %f\r\n", angle_x, angle_y, angle_z, dt);
+//		LOG("roll/pitch/yaw %f:%f:%f\r\n", kal_angle_x, 0.0f, 0.0f);
+//	}
+//
+//
+//}
+
+void gimbal_kalman_angle()
+{
+	int16_t aX=0, aY=0, aZ=0, gX=0, gY=0, gZ=0, mX=0, mY=0, mZ=0;
+
+	read_sensor_data(&aX, &aY, &aZ, &gX, &gY, &gZ, &mX, &mY, &mZ);
+
+	clock_time_t t_now = clock_time();
+
+
+	clock_time_t delta_t = (t_now-_last_time_read);
+
+	float dt = ((float)delta_t)/1000.0f;
+
+	float accel_x = (float)aX;
+	float accel_y = (float)aY;
+	float accel_z = (float)aZ;
+
+	float gyro_x = (float)gX;
+	float gyro_y = (float)gY;
+	float gyro_z = (float)gZ;
+
+	gyro_x = ((float) gX)*DEG_TO_RAD;
+	gyro_y = ((float) gY)*DEG_TO_RAD;
+	gyro_z = ((float) gZ)*DEG_TO_RAD;
+
+
+	// restricting pitch
+	float roll = atan2(accel_y, accel_z) * RAD_TO_DEG;
+	float pitch = atan(-accel_x / sqrt(pow(accel_y, 2) + pow(accel_z, 2))) * RAD_TO_DEG;
+
+	if((roll < -90.0f && kal_angle_x > 90.0f) || (roll > 90.0f && kal_angle_x < -90.0f)) {
+		kalman_roll.k_angle = roll;
+		kal_angle_x = roll;
+
+	} else {
+		//kal_angle_x = get_angle(roll, gyro_x, dt);
+
+		kal_angle_x = get_angle2(&kalman_roll, roll, gyro_x, dt);
+	}
+
+	_last_time_read = t_now;
+
+	// Throttle output to .1x per second
+	if(clock_time() >= f_log_timeout) {
+		f_log_timeout = clock_time() + 10;
+		//LOG("%f %f %f %f\r\n", angle_x, angle_y, angle_z, dt);
+		LOG("roll/pitch/yaw %f:%f:%f\r\n", kal_angle_x, 0.0f, 0.0f);
+	}
+
+
 }
 
 

@@ -13,6 +13,9 @@
 
 #include "../util/defines.h"
 
+
+
+
 float q_angle;		// process noise variance for the accel
 float q_bias;		// process noise variance for the gyro bias
 float r_measure;	// measurement noise variance - this is actually the variance of the measurement noise
