@@ -23,6 +23,7 @@
 #include "eeprom/eeprom.h"
 //#include "blc/blc.h"
 #include "gimbal/gimbal.h"
+#include "pwm/pwm.h"
 
 
 
@@ -105,7 +106,7 @@ void main()
 	LOG("gimbal_init...\r\n");
 	gimbal_init();
 	//kalman_init();
-
+	pwm_init();
 
 
 
@@ -125,6 +126,13 @@ void main()
 		}
 
 		gimbal_tick();
+
+		kal_angle_x = 0.0f;
+		kal_angle_y = 0.0f;
+
+//#define duty_min 185
+//#define duty_max 255
+
 		//balance();
 	}
 }

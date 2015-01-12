@@ -20,6 +20,9 @@ enum gimbal_states {
 
 volatile extern int8_t gimbal_state;
 
+extern float kal_angle_x;
+extern float kal_angle_y;
+
 #define DEG_TO_RAD 0.017453292519943295769236907684886
 #define RAD_TO_DEG 57.295779513082320876798154814105
 
