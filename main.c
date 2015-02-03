@@ -32,9 +32,14 @@
 static const char _tag[] PROGMEM = "main: ";
 volatile char term_in = 0;
 
+
+// pid variables
+clock_time_t pid_timer = 0;
+clock_time_t last_pid_read = 0;
+float pid_val = 0.0f;
 // local porototypes
 void balance();
-int32_t calc_pid();
+void calc_pid();
 
 void terminal_in_cb(uint8_t c)
 {
@@ -56,6 +61,8 @@ void main()
 	debug_init(terminal_in_cb);
 	clock_init();
 	sei();
+
+	last_pid_read = clock_time();
 
 	LOG("\r\n\r\nspike_328p_segway starting...\r\n");
 
@@ -126,52 +133,95 @@ void main()
 		}
 
 		gimbal_tick();
+		balance();
 
-		kal_angle_x = 0.0f;
-		kal_angle_y = 0.0f;
-
-//#define duty_min 185
-//#define duty_max 255
-
-		//balance();
 	}
 }
 
 
-// pid defines
-#define k_p		 7
-#define k_i		 1
-#define k_d		-5
+#define duty_min 185
+#define duty_max 255
+#define duty_range (duty_max-duty_min)
 
-int32_t center_val = 0;
+uint8_t pwm_out = duty_min + (duty_range/2);
 
 
-int32_t error = 0;
-int32_t proportion = 0;
-int32_t integral = 0;
-int32_t derivative = 0;
-int32_t output = 0;
-int32_t prev_error = 0;
 
 
 void balance()
 {
-	output = calc_pid();
 
-	LOG("pid_loop_out:%d\r\n", output);
+
+//	kal_angle_x = 0.0f;
+//	kal_angle_y = 0.0f;
+
+	calc_pid();
+	int pid_out_i = (int) pid_val;
+
+
+	//int pwm_output = pwm_out + pid_output;
+
+
+	//LOG("pid_output_f %f pwm_output_i: %d\r\n", pid_val, pid_out_i);
+	//LOG("pid_val2: %f\r\n", pid_val);
+	//pwm_out = constrain(output, duty_min, duty_max);
+
+	pwm_setval(pwm_out, 2);
+
+
+	//LOG("pid_loop_out:%d\r\n", pwm_out);
 }
 
-int32_t calc_pid()
+
+
+// pid defines
+//#define k_p		 7
+//#define k_i		 1
+//#define k_d		-5
+
+#define k_p		 9
+#define k_i		 2
+#define k_d		 3
+
+float center_val = 0.0f;
+
+int32_t error = 0;
+int32_t proportion = 0;
+float integral = 0.0f;
+int32_t derivative = 0;
+int32_t output = 0;
+int32_t prev_error = 0;
+float last_error = 0.0f;
+
+void calc_pid()
 {
-	error = center_val - gimbal_angle.X;
-	proportion = error;
-	integral += error;
-	derivative = (error - prev_error);
+	// guard against initial windup
+//	if(last_pid_read == 0) {
+//		last_pid_read = clock_time();
+//		return;
+//	}
+	clock_time_t t_now = clock_time();
 
-	int32_t out = (k_p * proportion) + (k_i * integral) + (k_d * derivative);
-	prev_error = error;
+	float delta_t = (t_now-last_pid_read)/1000.0f;
 
-	return out;
+	float pid_error = (center_val - kal_angle_x);
+	float p_term = k_p * pid_error;
+	integral += pid_error * delta_t;
+	integral = constrain(integral, -1.0, 1.0); // limit the error
+	float i_term = (k_i * 100.0) * integral;
+	float d_term = (k_d * 100.0) * (pid_error - last_error)/delta_t;
+	last_error = pid_error;
+
+	pid_val = p_term + i_term + d_term;
+
+	last_pid_read = t_now;
+
+	//LOG("pid err int dlt: %f %f %f %f\r\n", pid_val, err, integral, delta_t);
+	LOG("pid %f err %f int %f dlt %f\r\n", pid_val, pid_error, integral, delta_t);
+	//LOG("pid_val: %f\r\n", pid_val);
+
+
+
 }
 
 
